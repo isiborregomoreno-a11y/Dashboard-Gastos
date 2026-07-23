@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard de Gastos — Deztaca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --navy:#1C2363;
+    --navy-light:#4A50A0;
+    --verde:#008257;
+    --verde-light:#4FBE8F;
+    --cyan:#00BEEA;
+    --cyan-light:#8FE3F5;
+    --bg:#F4F6F9;
+    --card:#FFFFFF;
+    --text:#2D2D2D;
+    --muted:#6B7280;
+    --border:#E3E7ED;
+    --danger:#D64545;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
+  h1,h2,h3,.num,.kpi-value{font-family:'Space Grotesk',sans-serif;}
+
+  /* ===== Header ===== */
+  header{
+    background:var(--navy);
+    color:#fff;
+    padding:20px 32px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:16px;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand-mark{
+    width:38px;height:38px;border-radius:10px;
+    background:linear-gradient(135deg,var(--cyan),var(--verde));
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:15px;color:var(--navy);
+  }
+  .brand h1{font-size:19px;margin:0;font-weight:600;letter-spacing:.2px;}
+  .brand p{margin:2px 0 0;font-size:12.5px;color:#C7CBEE;}
+
+  .refresh-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .refresh-controls select, .refresh-controls button{
+    font-family:'Inter',sans-serif;font-size:13px;border-radius:8px;border:none;padding:9px 14px;cursor:pointer;
+  }
+  .refresh-controls select{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);}
+  .refresh-controls select option{color:#2D2D2D;}
+  #btnActualizar{
+    background:var(--cyan);color:var(--navy);font-weight:600;display:flex;align-items:center;gap:6px;
+    transition:transform .15s ease, background .15s ease;
+  }
+  #btnActualizar:hover{background:var(--cyan-light);}
+  #btnActualizar:active{transform:scale(.96);}
+  #btnActualizar.loading .spin{animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .last-updated{font-size:11.5px;color:#AEB4E8;}
+
+  /* ===== Layout ===== */
+  main{padding:24px 32px 60px;max-width:1400px;margin:0 auto;}
+
+  /* ===== Filters ===== */
+  .filters{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:16px 20px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:18px;
+    align-items:flex-end;
+    margin-bottom:22px;
+  }
+  .filter-group{display:flex;flex-direction:column;gap:6px;}
+  .filter-group label{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;}
+  .filter-group input[type=date], .filter-group select{
+    border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13.5px;font-family:'Inter',sans-serif;color:var(--text);background:#fff;min-width:140px;
+  }
+  .chip-group{display:flex;gap:6px;flex-wrap:wrap;max-width:320px;}
+  .chip{
+    border:1px solid var(--border);border-radius:999px;padding:6px 13px;font-size:12.5px;cursor:pointer;user-select:none;
+    background:#fff;color:var(--muted);transition:all .15s;
+  }
+  .chip.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .type-toggle{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .type-toggle button{border:none;background:#fff;padding:8px 14px;font-size:13px;cursor:pointer;color:var(--muted);font-family:'Inter';}
+  .type-toggle button.active{background:var(--verde);color:#fff;}
+  #btnReset{
+    margin-left:auto;background:none;border:1px solid var(--border);border-radius:8px;padding:9px 14px;font-size:13px;color:var(--muted);cursor:pointer;
+  }
+  #btnReset:hover{border-color:var(--danger);color:var(--danger);}
+
+  /* ===== KPIs ===== */
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px;}
+  .kpi-card{
+    background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    padding:18px 20px;position:relative;overflow:hidden;
+  }
+  .kpi-card .label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+  .kpi-value{font-size:26px;font-weight:700;margin-top:8px;color:var(--navy);}
+  .kpi-sub{font-size:12px;color:var(--muted);margin-top:4px;}
+  .kpi-card::after{content:'';position:absolute;right:-20px;bottom:-20px;width:70px;height:70px;border-radius:50%;opacity:.08;}
+  .kpi-card.c1::after{background:var(--navy);}
+  .kpi-card.c2::after{background:var(--cyan);}
+  .kpi-card.c3::after{background:var(--verde);}
+  .kpi-card.c4::after{background:var(--navy);}
+
+  /* ===== Signature: fijo vs variable bar ===== */
+  .signature{
+    background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    padding:20px 24px;margin-bottom:22px;
+  }
+  .signature h3{margin:0 0 4px;font-size:14.5px;color:var(--navy);}
+  .signature p.desc{margin:0 0 14px;font-size:12.5px;color:var(--muted);}
+  .split-bar{height:26px;border-radius:999px;overflow:hidden;display:flex;background:var(--border);}
+  .split-bar .seg-fijo{background:var(--navy);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;transition:width .5s ease;}
+  .split-bar .seg-var{background:var(--cyan);display:flex;align-items:center;justify-content:center;color:var(--navy);font-size:12px;font-weight:600;transition:width .5s ease;}
+  .split-legend{display:flex;gap:22px;margin-top:10px;font-size:12.5px;color:var(--muted);}
+  .split-legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
+
+  /* ===== Charts grid ===== */
+  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px;}
+  .chart-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;}
+  .chart-card h3{margin:0 0 14px;font-size:14.5px;color:var(--navy);}
+  .chart-card .canvas-wrap{position:relative;height:280px;}
+  .chart-card.wide{grid-column:1/-1;}
+  .chart-card.wide .canvas-wrap{height:320px;}
+
+  /* ===== Table ===== */
+  .table-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;}
+  .table-head{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:14px;flex-wrap:wrap;}
+  .table-head h3{margin:0;font-size:14.5px;color:var(--navy);}
+  #search{border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;min-width:220px;font-family:'Inter';}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{
+    text-align:left;padding:10px 12px;border-bottom:2px solid var(--border);color:var(--muted);
+    text-transform:uppercase;font-size:11px;letter-spacing:.05em;cursor:pointer;white-space:nowrap;
+  }
+  thead th:hover{color:var(--navy);}
+  tbody td{padding:9px 12px;border-bottom:1px solid var(--border);}
+  tbody tr:hover{background:#F9FAFC;}
+  .badge{padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;}
+  .badge.fijo{background:rgba(28,35,99,.1);color:var(--navy);}
+  .badge.variable{background:rgba(0,190,234,.15);color:#007A94;}
+  .amount{font-weight:600;color:var(--navy);text-align:right;}
+  .amount.neg{color:var(--danger);}
+  .table-footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:12px;color:var(--muted);}
+  .empty-state{text-align:center;padding:40px 20px;color:var(--muted);}
+
+  #loadingOverlay{
+    position:fixed;inset:0;background:rgba(244,246,249,.85);display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:10px;z-index:999;font-size:14px;color:var(--navy);font-weight:600;
+  }
+  #loadingOverlay .spinner{width:34px;height:34px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .8s linear infinite;}
+  #errorBanner{
+    display:none;background:#FDEDED;border:1px solid #F3B4B4;color:#9A2A2A;padding:12px 18px;border-radius:10px;margin-bottom:18px;font-size:13.5px;
+  }
+
+  @media (max-width:900px){
+    .kpi-row{grid-template-columns:1fr 1fr;}
+    .charts-grid{grid-template-columns:1fr;}
+    main{padding:18px;}
+    header{padding:16px 18px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay"><div class="spinner"></div>Cargando datos de Google Sheets…</div>
+
+<header>
+  <div class="brand">
+    <div class="brand-mark">D</div>
+    <div>
+      <h1>Dashboard de Gastos</h1>
+      <p>Deztaca · Hoja "Julio" · Google Sheets</p>
+    </div>
+  </div>
+  <div class="refresh-controls">
+    <span class="last-updated" id="lastUpdated">Sin datos aún</span>
+    <select id="intervalSelect">
+      <option value="0">Actualización automática: desactivada</option>
+      <option value="30000">Cada 30 segundos</option>
+      <option value="60000">Cada 1 minuto</option>
+      <option value="300000">Cada 5 minutos</option>
+      <option value="900000">Cada 15 minutos</option>
+      <option value="1800000">Cada 30 minutos</option>
+    </select>
+    <button id="btnActualizar">
+      <svg class="spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+      Actualizar
+    </button>
+  </div>
+</header>
+
+<main>
+  <div id="errorBanner"></div>
+
+  <div class="filters">
+    <div class="filter-group">
+      <label>Desde</label>
+      <input type="date" id="fechaDesde">
+    </div>
+    <div class="filter-group">
+      <label>Hasta</label>
+      <input type="date" id="fechaHasta">
+    </div>
+    <div class="filter-group">
+      <label>Categorías</label>
+      <div class="chip-group" id="categoryChips"></div>
+    </div>
+    <div class="filter-group">
+      <label>Tipo</label>
+      <div class="type-toggle" id="typeToggle">
+        <button class="active" data-type="TODOS">Todos</button>
+        <button data-type="FIJO">Fijo</button>
+        <button data-type="VARIABLE">Variable</button>
+      </div>
+    </div>
+    <button id="btnReset">Limpiar filtros</button>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card c1">
+      <div class="label">Gasto total</div>
+      <div class="kpi-value" id="kpiTotal">—</div>
+      <div class="kpi-sub" id="kpiTotalSub">&nbsp;</div>
+    </div>
+    <div class="kpi-card c2">
+      <div class="label">Gasto variable</div>
+      <div class="kpi-value" id="kpiVariable">—</div>
+      <div class="kpi-sub" id="kpiVariableSub">&nbsp;</div>
+    </div>
+    <div class="kpi-card c3">
+      <div class="label">Gasto fijo</div>
+      <div class="kpi-value" id="kpiFijo">—</div>
+      <div class="kpi-sub" id="kpiFijoSub">&nbsp;</div>
+    </div>
+    <div class="kpi-card c4">
+      <div class="label">Promedio diario</div>
+      <div class="kpi-value" id="kpiPromedio">—</div>
+      <div class="kpi-sub" id="kpiPromedioSub">&nbsp;</div>
+    </div>
+  </div>
+
+  <div class="signature">
+    <h3>Comprometido vs flexible</h3>
+    <p class="desc">Qué parte de tu gasto es fijo (difícil de mover) frente a variable (margen real de ahorro).</p>
+    <div class="split-bar">
+      <div class="seg-fijo" id="segFijo" style="width:50%">—</div>
+      <div class="seg-var" id="segVar" style="width:50%">—</div>
+    </div>
+    <div class="split-legend">
+      <span><i class="dot" style="background:var(--navy)"></i>Fijo</span>
+      <span><i class="dot" style="background:var(--cyan)"></i>Variable</span>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>Gasto por categoría</h3>
+      <div class="canvas-wrap"><canvas id="chartCategoria"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Fijo vs variable por categoría</h3>
+      <div class="canvas-wrap"><canvas id="chartFijoVar"></canvas></div>
+    </div>
+    <div class="chart-card wide">
+      <h3>Evolución del gasto</h3>
+      <div class="canvas-wrap"><canvas id="chartEvolucion"></canvas></div>
+    </div>
+    <div class="chart-card wide">
+      <h3>Detalle por subcategoría (gastos hormiga)</h3>
+      <div class="canvas-wrap"><canvas id="chartSubcategoria"></canvas></div>
+    </div>
+  </div>
+
+  <div class="table-card">
+    <div class="table-head">
+      <h3>Movimientos</h3>
+      <input type="text" id="search" placeholder="Buscar por categoría, subcategoría o detalle…">
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th data-key="categoria">Categoría</th>
+            <th data-key="subcategoria">Subcategoría</th>
+            <th data-key="fecha">Fecha</th>
+            <th data-key="detalle">Tipo</th>
+            <th data-key="importe" style="text-align:right;">Importe</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" style="display:none;">No hay movimientos que coincidan con los filtros.</div>
+    </div>
+    <div class="table-footer">
+      <span id="rowCount">0 movimientos</span>
+      <span id="rowTotal"></span>
+    </div>
+  </div>
+</main>
+
+<script>
+/* ============ CONFIG ============ */
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxGGG8_toEiVTAio9nl1j1iafHgmFX-wHrNjJJsnUYcuXq8BTKWgm3MeCtqsGQbckG5/exec";
+const PALETTE = ["#1C2363","#00BEEA","#008257","#4A50A0","#4FBE8F","#8FE3F5","#8A8FA8","#B7BCE0"];
+
+/* ============ STATE ============ */
+let rawData = [];       // datos crudos normalizados
+let filtered = [];      // datos tras aplicar filtros
+let activeCategories = new Set();
+let activeType = "TODOS";
+let sortState = { key: "fecha", dir: "desc" };
+let autoRefreshTimer = null;
+let charts = {};
+
+/* ============ HELPERS ============ */
+function normalizeKey(str){
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+}
+
+function parseImporte(val){
+  if (typeof val === 'number') return val;
+  if (val === null || val === undefined || val === '') return 0;
+  let s = String(val).replace('€','').trim();
+  s = s.replace(/\./g,'').replace(',', '.');
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+function parseFecha(val){
+  if (val instanceof Date) return val;
+  if (typeof val === 'string'){
+    if (/^\d{4}-\d{2}-\d{2}/.test(val)) return new Date(val);
+    const parts = val.split('/');
+    if (parts.length === 3){
+      const d = parseInt(parts[0],10), m = parseInt(parts[1],10), y = parseInt(parts[2],10);
+      return new Date(y, m-1, d);
+    }
+  }
+  const d = new Date(val);
+  return isNaN(d) ? null : d;
+}
+
+function fmtMoney(n){
+  return n.toLocaleString('es-ES', {style:'currency', currency:'EUR', maximumFractionDigits:2});
+}
+
+function fmtDate(d){
+  if (!d) return '—';
+  return d.toLocaleDateString('es-ES', {day:'2-digit', month:'2-digit', year:'numeric'});
+}
+
+function toISODate(d){
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+/* ============ FETCH & NORMALIZE ============ */
+async function fetchData(){
+  const btn = document.getElementById('btnActualizar');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  hideError();
+  try{
+    const res = await fetch(WEBAPP_URL, {cache:"no-store"});
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    rawData = normalizeRows(json);
+    buildCategoryChips();
+    applyFilters();
+    document.getElementById('lastUpdated').textContent =
+      "Actualizado: " + new Date().toLocaleTimeString('es-ES');
+  }catch(err){
+    console.error(err);
+    showError("No se pudieron cargar los datos desde Google Sheets. Revisa que el Web App esté implementado con acceso 'Cualquier usuario' y vuelve a intentarlo. Detalle: " + err.message);
+  }finally{
+    btn.classList.remove('loading');
+    btn.disabled = false;
+    document.getElementById('loadingOverlay').style.display = 'none';
+  }
+}
+
+function normalizeRows(json){
+  if (!Array.isArray(json) || json.length === 0) return [];
+  return json.map(row => {
+    let out = {categoria:'', subcategoria:'', fecha:null, detalle:'', importe:0};
+    Object.keys(row).forEach(k => {
+      const nk = normalizeKey(k);
+      if (nk.includes('CATEGORIA') && !nk.includes('SUB')) out.categoria = String(row[k]||'').trim();
+      else if (nk.includes('SUBCATEGORIA')) out.subcategoria = String(row[k]||'').trim();
+      else if (nk.includes('FECHA')) out.fecha = parseFecha(row[k]);
+      else if (nk.includes('DETALLE')) out.detalle = String(row[k]||'').trim();
+      else if (nk.includes('IMPORTE')) out.importe = parseImporte(row[k]);
+    });
+    return out;
+  }).filter(r => r.categoria || r.subcategoria);
+}
+
+function showError(msg){
+  const el = document.getElementById('errorBanner');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function hideError(){
+  document.getElementById('errorBanner').style.display = 'none';
+}
+
+/* ============ FILTERS ============ */
+function buildCategoryChips(){
+  const cats = [...new Set(rawData.map(r => r.categoria).filter(Boolean))].sort();
+  if (activeCategories.size === 0) cats.forEach(c => activeCategories.add(c));
+  const wrap = document.getElementById('categoryChips');
+  wrap.innerHTML = '';
+  cats.forEach(cat => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (activeCategories.has(cat) ? ' active' : '');
+    chip.textContent = cat;
+    chip.addEventListener('click', () => {
+      if (activeCategories.has(cat)) activeCategories.delete(cat);
+      else activeCategories.add(cat);
+      chip.classList.toggle('active');
+      applyFilters();
+    });
+    wrap.appendChild(chip);
+  });
+}
+
+function parseInputDate(str, endOfDay){
+  // str viene como "yyyy-mm-dd" del <input type="date">. Lo parseamos en hora LOCAL
+  // (evita que new Date("yyyy-mm-dd"), que es UTC, se desplace un día por el huso horario).
+  if (!str) return null;
+  const [y, m, d] = str.split('-').map(n => parseInt(n, 10));
+  return endOfDay ? new Date(y, m-1, d, 23, 59, 59, 999) : new Date(y, m-1, d, 0, 0, 0, 0);
+}
+
+function applyFilters(){
+  const desde = parseInputDate(document.getElementById('fechaDesde').value, false);
+  const hasta = parseInputDate(document.getElementById('fechaHasta').value, true);
+  const search = document.getElementById('search').value.trim().toLowerCase();
+
+  filtered = rawData.filter(r => {
+    if (desde && r.fecha && r.fecha < desde) return false;
+    if (hasta && r.fecha && r.fecha > hasta) return false;
+    if (activeCategories.size > 0 && !activeCategories.has(r.categoria)) return false;
+    if (activeType !== "TODOS"){
+      const tipo = normalizeKey(r.detalle);
+      if (activeType === "FIJO" && tipo !== "FIJO") return false;
+      if (activeType === "VARIABLE" && tipo !== "VARIABLE") return false;
+    }
+    if (search){
+      const hay = `${r.categoria} ${r.subcategoria} ${r.detalle}`.toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  renderAll();
+}
+
+/* ============ RENDER: KPIs ============ */
+function renderKPIs(){
+  const total = filtered.reduce((s,r)=>s+r.importe,0);
+  const fijo = filtered.filter(r=>normalizeKey(r.detalle)==='FIJO').reduce((s,r)=>s+r.importe,0);
+  const variable = filtered.filter(r=>normalizeKey(r.detalle)==='VARIABLE').reduce((s,r)=>s+r.importe,0);
+
+  const fechas = filtered.map(r=>r.fecha).filter(Boolean);
+  let dias = 1;
+  if (fechas.length){
+    const min = new Date(Math.min(...fechas));
+    const max = new Date(Math.max(...fechas));
+    dias = Math.max(1, Math.round((max-min)/86400000)+1);
+  }
+  const promedio = total/dias;
+
+  document.getElementById('kpiTotal').textContent = fmtMoney(total);
+  document.getElementById('kpiTotalSub').textContent = `${filtered.length} movimientos`;
+  document.getElementById('kpiVariable').textContent = fmtMoney(variable);
+  document.getElementById('kpiVariableSub').textContent = total ? `${Math.round(Math.abs(variable/total)*100)}% del total` : '';
+  document.getElementById('kpiFijo').textContent = fmtMoney(fijo);
+  document.getElementById('kpiFijoSub').textContent = total ? `${Math.round(Math.abs(fijo/total)*100)}% del total` : '';
+  document.getElementById('kpiPromedio').textContent = fmtMoney(promedio);
+  document.getElementById('kpiPromedioSub').textContent = `sobre ${dias} día(s)`;
+
+  const absFijo = Math.abs(fijo), absVar = Math.abs(variable);
+  const sum = absFijo+absVar || 1;
+  const pctFijo = Math.round(absFijo/sum*100);
+  const pctVar = 100-pctFijo;
+  document.getElementById('segFijo').style.width = pctFijo+'%';
+  document.getElementById('segVar').style.width = pctVar+'%';
+  document.getElementById('segFijo').textContent = pctFijo >= 12 ? pctFijo+'%' : '';
+  document.getElementById('segVar').textContent = pctVar >= 12 ? pctVar+'%' : '';
+}
+
+/* ============ RENDER: CHARTS ============ */
+function destroyChart(id){ if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function renderCategoriaChart(){
+  const map = {};
+  filtered.forEach(r => { map[r.categoria] = (map[r.categoria]||0) + Math.abs(r.importe); });
+  const labels = Object.keys(map);
+  const values = Object.values(map);
+  destroyChart('categoria');
+  charts.categoria = new Chart(document.getElementById('chartCategoria'), {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data:values, backgroundColor:labels.map((_,i)=>PALETTE[i%PALETTE.length]), borderWidth:2, borderColor:'#fff' }]},
+    options:{ maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}, tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${fmtMoney(ctx.raw)}`}} } }
+  });
+}
+
+function renderFijoVarChart(){
+  const cats = [...new Set(filtered.map(r=>r.categoria))];
+  const fijoVals = cats.map(c => filtered.filter(r=>r.categoria===c && normalizeKey(r.detalle)==='FIJO').reduce((s,r)=>s+Math.abs(r.importe),0));
+  const varVals = cats.map(c => filtered.filter(r=>r.categoria===c && normalizeKey(r.detalle)==='VARIABLE').reduce((s,r)=>s+Math.abs(r.importe),0));
+  destroyChart('fijovar');
+  charts.fijovar = new Chart(document.getElementById('chartFijoVar'), {
+    type:'bar',
+    data:{ labels:cats, datasets:[
+      {label:'Fijo', data:fijoVals, backgroundColor:'#1C2363', borderRadius:4},
+      {label:'Variable', data:varVals, backgroundColor:'#00BEEA', borderRadius:4}
+    ]},
+    options:{ maintainAspectRatio:false, scales:{ x:{stacked:true, grid:{display:false}}, y:{stacked:true, grid:{color:'#F0F1F5'}} }, plugins:{legend:{position:'bottom', labels:{boxWidth:10,font:{size:11}}}} }
+  });
+}
+
+function renderEvolucionChart(){
+  const map = {};
+  filtered.forEach(r => {
+    if (!r.fecha) return;
+    const key = toISODate(r.fecha);
+    if (!map[key]) map[key] = {fijo:0, variable:0};
+    if (normalizeKey(r.detalle)==='FIJO') map[key].fijo += Math.abs(r.importe);
+    else map[key].variable += Math.abs(r.importe);
+  });
+  const labels = Object.keys(map).sort();
+  const fijoVals = labels.map(l=>map[l].fijo);
+  const varVals = labels.map(l=>map[l].variable);
+  destroyChart('evolucion');
+  charts.evolucion = new Chart(document.getElementById('chartEvolucion'), {
+    type:'bar',
+    data:{ labels: labels.map(l=>fmtDate(new Date(l))), datasets:[
+      {label:'Fijo', data:fijoVals, backgroundColor:'#1C2363', borderRadius:3, stack:'a'},
+      {label:'Variable', data:varVals, backgroundColor:'#00BEEA', borderRadius:3, stack:'a'}
+    ]},
+    options:{ maintainAspectRatio:false, scales:{ x:{stacked:true, grid:{display:false}, ticks:{maxRotation:60, minRotation:0}}, y:{stacked:true, grid:{color:'#F0F1F5'}} }, plugins:{legend:{position:'bottom', labels:{boxWidth:10,font:{size:11}}}} }
+  });
+}
+
+function renderSubcategoriaChart(){
+  const map = {};
+  filtered.forEach(r => {
+    const key = `${r.categoria} · ${r.subcategoria}`;
+    map[key] = (map[key]||0) + Math.abs(r.importe);
+  });
+  const entries = Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  destroyChart('subcategoria');
+  charts.subcategoria = new Chart(document.getElementById('chartSubcategoria'), {
+    type:'bar',
+    data:{ labels:entries.map(e=>e[0]), datasets:[{ data:entries.map(e=>e[1]), backgroundColor:'#008257', borderRadius:4 }]},
+    options:{ indexAxis:'y', maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>fmtMoney(ctx.raw)}}}, scales:{ x:{grid:{color:'#F0F1F5'}}, y:{grid:{display:false}, ticks:{font:{size:11}}} } }
+  });
+}
+
+/* ============ RENDER: TABLE ============ */
+function renderTable(){
+  let rows = [...filtered];
+  rows.sort((a,b) => {
+    let va = a[sortState.key], vb = b[sortState.key];
+    if (sortState.key === 'fecha'){ va = va ? va.getTime() : 0; vb = vb ? vb.getTime() : 0; }
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return sortState.dir === 'asc' ? -1 : 1;
+    if (va > vb) return sortState.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+  document.getElementById('emptyState').style.display = rows.length ? 'none' : 'block';
+
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    const tipoClass = normalizeKey(r.detalle) === 'FIJO' ? 'fijo' : 'variable';
+    tr.innerHTML = `
+      <td>${r.categoria}</td>
+      <td>${r.subcategoria}</td>
+      <td>${fmtDate(r.fecha)}</td>
+      <td><span class="badge ${tipoClass}">${r.detalle||'—'}</span></td>
+      <td class="amount ${r.importe<0?'neg':''}">${fmtMoney(r.importe)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('rowCount').textContent = `${rows.length} movimiento${rows.length===1?'':'s'}`;
+  document.getElementById('rowTotal').textContent = `Total: ${fmtMoney(rows.reduce((s,r)=>s+r.importe,0))}`;
+}
+
+function renderAll(){
+  renderKPIs();
+  renderCategoriaChart();
+  renderFijoVarChart();
+  renderEvolucionChart();
+  renderSubcategoriaChart();
+  renderTable();
+}
+
+/* ============ EVENTS ============ */
+document.getElementById('fechaDesde').addEventListener('change', applyFilters);
+document.getElementById('fechaHasta').addEventListener('change', applyFilters);
+document.getElementById('search').addEventListener('input', applyFilters);
+
+document.getElementById('typeToggle').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  document.querySelectorAll('#typeToggle button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  activeType = btn.dataset.type;
+  applyFilters();
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  document.getElementById('fechaDesde').value = '';
+  document.getElementById('fechaHasta').value = '';
+  document.getElementById('search').value = '';
+  activeType = 'TODOS';
+  document.querySelectorAll('#typeToggle button').forEach(b=>b.classList.remove('active'));
+  document.querySelector('#typeToggle button[data-type="TODOS"]').classList.add('active');
+  activeCategories = new Set(rawData.map(r=>r.categoria));
+  buildCategoryChips();
+  applyFilters();
+});
+
+document.querySelectorAll('thead th').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    if (sortState.key === key) sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+    else { sortState.key = key; sortState.dir = 'asc'; }
+    renderTable();
+  });
+});
+
+document.getElementById('btnActualizar').addEventListener('click', fetchData);
+
+document.getElementById('intervalSelect').addEventListener('change', e => {
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  const ms = parseInt(e.target.value, 10);
+  if (ms > 0) autoRefreshTimer = setInterval(fetchData, ms);
+});
+
+/* ============ INIT ============ */
+fetchData();
+</script>
+</body>
+</html>
